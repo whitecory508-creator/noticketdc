@@ -370,7 +370,7 @@ export default function App() {
   const spokenCameraIdsRef = useRef({});
   const insideRadiusIdsRef = useRef({});
   const nativeWatchCallbackIdRef = useRef(null);
-  const lastSpokenNavStepRef = useRef(-1);
+  const lastSpokenNavStepRef = useRef("");
 
   useEffect(() => {
     async function bootstrap() {
@@ -672,43 +672,62 @@ export default function App() {
   }, [started, position, cameras, voiceEnabled, alertRadiusFeet, routeCoords]);
   useEffect(() => {
     if (!isNavigating || !position || routeSteps.length === 0) return;
-
+  
     const currentStep = routeSteps[navStepIndex];
     if (!currentStep) return;
-
-    if (lastSpokenNavStepRef.current !== navStepIndex) {
-      const instruction = buildStepInstruction(currentStep);
-      if (voiceEnabled) {
-        speakText(instruction);
-      }
-      lastSpokenNavStepRef.current = navStepIndex;
-      setStatus(`Navigation active: ${instruction}`);
-    }
-
+  
     const maneuverLocation = currentStep?.maneuver?.location;
     if (!Array.isArray(maneuverLocation) || maneuverLocation.length < 2) return;
-
+  
     const [stepLng, stepLat] = maneuverLocation;
-
+  
     if (!Number.isFinite(stepLat) || !Number.isFinite(stepLng)) return;
-
+  
     const distanceToStep = distanceInMeters(
       position.coords.latitude,
       position.coords.longitude,
       stepLat,
       stepLng
     );
-
-    if (distanceToStep <= 40) {
-      if (navStepIndex < routeSteps.length - 1) {
-        setNavStepIndex((prev) => prev + 1);
-      } else {
-        if (voiceEnabled) {
-          speakText("You have arrived at your destination.");
-        }
-        setIsNavigating(false);
-        setStatus("Navigation complete. You have arrived.");
+  
+    const instruction = buildStepInstruction(currentStep);
+  
+    // stage 1: early heads-up around 100 feet
+    if (
+      distanceToStep <= 30.5 &&
+      distanceToStep > 10 &&
+      lastSpokenNavStepRef.current !== `approach-${navStepIndex}`
+    ) {
+      if (voiceEnabled) {
+        speakText(`In 100 feet, ${instruction.toLowerCase()}`);
       }
+      lastSpokenNavStepRef.current = `approach-${navStepIndex}`;
+      setStatus(`Navigation active: In 100 feet, ${instruction}`);
+      return;
+    }
+  
+    // stage 2: at the turn
+    if (
+      distanceToStep <= 10 &&
+      lastSpokenNavStepRef.current !== `turn-${navStepIndex}`
+    ) {
+      if (voiceEnabled) {
+        speakText(`${instruction} now`);
+      }
+      lastSpokenNavStepRef.current = `turn-${navStepIndex}`;
+      setStatus(`Navigation active: ${instruction} now`);
+  
+      setTimeout(() => {
+        if (navStepIndex < routeSteps.length - 1) {
+          setNavStepIndex((prev) => prev + 1);
+        } else {
+          if (voiceEnabled) {
+            speakText("You have arrived at your destination.");
+          }
+          setIsNavigating(false);
+          setStatus("Navigation complete. You have arrived.");
+        }
+      }, 1500);
     }
   }, [isNavigating, position, routeSteps, navStepIndex, voiceEnabled]);
 
@@ -845,7 +864,7 @@ export default function App() {
     }
     setIsNavigating(false);
     setNavStepIndex(0);
-    lastSpokenNavStepRef.current = -1;
+    lastSpokenNavStepRef.current = "";
     setStarted(false);
     setStatus("Traffic camera alerts stopped.");
     insideRadiusIdsRef.current = {};
@@ -887,7 +906,7 @@ export default function App() {
       setSearchResults([]);
       setIsNavigating(false);
       setNavStepIndex(0);
-      lastSpokenNavStepRef.current = -1;
+      lastSpokenNavStepRef.current = "";
 
       const updatedRecents = [
         place,
@@ -913,7 +932,7 @@ export default function App() {
       });
       setRouteSteps(route.steps);
       setNavStepIndex(0);
-      lastSpokenNavStepRef.current = -1;
+      lastSpokenNavStepRef.current = "";
       setStatus(
         "Route ready. Washington, DC traffic camera alerts will follow your active route."
       );
@@ -952,14 +971,14 @@ export default function App() {
 
     setIsNavigating(true);
     setNavStepIndex(0);
-    lastSpokenNavStepRef.current = -1;
+    lastSpokenNavStepRef.current = "";
     setStatus("Navigation started.");
   }
 
   function stopNavigation() {
     setIsNavigating(false);
     setNavStepIndex(0);
-    lastSpokenNavStepRef.current = -1;
+    lastSpokenNavStepRef.current = "";
 
     if (typeof window !== "undefined" && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -977,7 +996,7 @@ export default function App() {
     setSearchQuery("");
     setIsNavigating(false);
     setNavStepIndex(0);
-    lastSpokenNavStepRef.current = -1;
+    lastSpokenNavStepRef.current = "";
     setStatus(
       started
         ? "Traffic camera alerts are active. Route cleared."
@@ -1659,3 +1678,4 @@ export default function App() {
     </div>
   );
 }
+

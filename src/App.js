@@ -968,11 +968,25 @@ export default function App() {
   }
   function startNavigation() {
     if (!routeSteps.length) return;
-
+  
     setIsNavigating(true);
     setNavStepIndex(0);
     lastSpokenNavStepRef.current = "";
-    setStatus("Navigation started.");
+  
+    const firstStep = routeSteps[0];
+    if (firstStep) {
+      const instruction = buildStepInstruction(firstStep);
+      setStatus(`Navigation started: ${instruction}`);
+  
+      if (voiceEnabled) {
+        speakText(`Starting navigation. ${instruction}`);
+      }
+  
+      lastSpokenNavStepRef.current = "started-0";
+    } else {
+      setStatus("Navigation started.");
+    }
+  }
   }
 
   function stopNavigation() {
@@ -1678,4 +1692,3 @@ export default function App() {
     </div>
   );
 }
-
